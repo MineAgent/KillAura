@@ -1,0 +1,76 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+version = project.version
+group = project.group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	// Minecraft 26.1+ ships unobfuscated (official names), so Loom needs no `mappings` dependency.
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	// Only the Fabric API module this mod actually uses is pulled in, instead of the whole
+	// aggregate `fabric-api` artifact.
+	implementation "net.fabricmc.fabric-api:fabric-lifecycle-events-v1:${project.fabric_lifecycle_version}"
+
+	// MGHttpdProvider's registration API (PathHandler + HttpdProvider.register). compileOnly: the
+	// jar must not be bundled, Fabric Loader loads the real one from .minecraft/mods/.
+	compileOnly files('libs/httpdprovider-1.1.1.jar')
+
+	testImplementation platform("org.junit:junit-bom:5.11.4")
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+processResources {
+	def modVersion = project.version
+	inputs.property "version", modVersion
+
+	filesMatching("fabric.mod.json") {
+		expand "version": modVersion
+	}
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = "UTF-8"
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+	withSourcesJar()
+}
+
+tasks.named('jar') {
+	// Reproducible archives.
+	preserveFileTimestamps = false
+	reproducibleFileOrder = true
+
+	manifest {
+		attributes(
+				'Implementation-Title': 'Kill Aura Reimpl',
+				'Implementation-Version': project.version
+		)
+	}
+}
+
+// Minecraft 26.1+ is unobfuscated, so the plain jar is the loadable one. If a Loom version does
+// provide a remapJar, name it consistently.
+tasks.matching { it.name == 'remapJar' }.configureEach {
+	archiveFileName = "killaura-reimpl-${project.version}.jar"
+}

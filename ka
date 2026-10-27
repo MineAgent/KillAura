@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: LGPL-3.0-only
+# Copyright (C) 2026 MineAgent
+# ka - control Kill Aura on the running Minecraft client.
+#
+#   ./ka state              current state (GET /ka/state)
+#   ./ka on                 enable           (POST /ka/on)
+#   ./ka off                disable          (POST /ka/off)
+#   ./ka toggle             flip the switch  (POST /ka/toggle)
+#   ./ka reload             re-read config/killaura.json
+#   ./ka config '{"range":4.5}'   patch config (POST /ka/config)
+#   ./ka help               full manual (GET /ka/)
+#
+# Environment:
+#   KA_URL   default http://127.0.0.1:3420/ka
+set -euo pipefail
+
+URL="${KA_URL:-http://127.0.0.1:3420/ka}"
+
+usage() {
+	sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+	exit "${1:-0}"
+}
+
+if [ $# -eq 0 ]; then
+	usage 1
+fi
+
+case "$1" in
+	-h | --help | help)
+		exec curl -sS "$URL/"
+		;;
+	state)
+		exec curl -sS "$URL/state"
+		;;
+	on | off | toggle | reload)
+		exec curl -sS -X POST "$URL/$1"
+		;;
+	config)
+		shift
+		if [ $# -eq 0 ]; then
+			echo "ka config: missing JSON body, e.g. '{\"range\":4.5}'" >&2
+			exit 1
+		fi
+		exec curl -sS -X POST -H 'Content-Type: application/json' --data-binary "$*" "$URL/config"
+		;;
+	*)
+		usage 1
+		;;
+esac
