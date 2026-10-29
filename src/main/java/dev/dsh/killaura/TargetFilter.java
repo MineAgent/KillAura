@@ -8,7 +8,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.entity.EntityTypeTest;
@@ -28,10 +27,11 @@ public final class TargetFilter {
         Vec3 eyes = self.getEyePosition();
         AABB searchArea = self.getBoundingBox().inflate(settings.range + 2.0);
         EntityTypeTest<Entity, LivingEntity> living = EntityTypeTest.forClass(LivingEntity.class);
-        List<LivingEntity> nearby = mc.level.getEntities(living, searchArea, e -> eligible(self, e, settings));
+        List<LivingEntity> nearby = mc.level.getEntities(living, searchArea, e -> baseEligible(self, e));
 
         LivingEntity best = null;
         double bestScore = Double.POSITIVE_INFINITY;
+        boolean bestForced = false;
 
         for (LivingEntity candidate : nearby) {
             AABB box = candidate.getBoundingBox();
@@ -44,7 +44,23 @@ public final class TargetFilter {
             if (settings.fov < 360.0 && offAxis > settings.fov / 2.0) {
                 continue;
             }
-            if (!settings.throughWalls && !self.hasLineOfSight(candidate)) {
+
+            String id = TargetClassifier.id(candidate);
+            if (settings.denyTargets.contains(id)) {
+                continue;
+            }
+
+            boolean forced = settings.alwaysTargets.contains(id);
+            boolean lineOfSight = forced || settings.throughWalls || self.hasLineOfSight(candidate);
+            TargetRules.Decision decision = TargetRules.evaluate(
+                    id,
+                    candidate instanceof Player,
+                    candidate instanceof ArmorStand,
+                    candidate.isInvisible(),
+                    lineOfSight,
+                    TargetClassifier.classify(candidate),
+                    settings);
+            if (decision == TargetRules.Decision.DENY) {
                 continue;
             }
 
@@ -54,34 +70,30 @@ public final class TargetFilter {
                 default -> gap;
             };
 
-            if (score < bestScore) {
-                bestScore = score;
+            boolean isForced = decision == TargetRules.Decision.FORCE;
+            if (best == null || isBetter(isForced, score, bestForced, bestScore)) {
                 best = candidate;
+                bestScore = score;
+                bestForced = isForced;
             }
         }
 
         return best;
     }
 
-    private static boolean eligible(LocalPlayer self, LivingEntity entity, AuraSettings settings) {
+    /**
+     * True when a forced target should replace the current best, or when two candidates of the
+     * same class are compared by the configured priority score.
+     */
+    static boolean isBetter(boolean forced, double score, boolean currentForced, double currentScore) {
+        return forced != currentForced ? forced : score < currentScore;
+    }
+
+    private static boolean baseEligible(LocalPlayer self, LivingEntity entity) {
         if (entity == self || !entity.isAlive() || entity.isDeadOrDying() || entity.isRemoved()) {
             return false;
         }
-        if (entity instanceof ArmorStand) {
-            return settings.targetArmorStands;
-        }
-        if (settings.ignoreInvisible && entity.isInvisible()) {
-            return false;
-        }
-        if (entity instanceof Player other) {
-            if (other.isSpectator() || other.isCreative()) {
-                return false;
-            }
-            return settings.targetPlayers;
-        }
-        return entity.getType().getCategory() == MobCategory.MONSTER
-                ? settings.targetHostile
-                : settings.targetPassive;
+        return !(entity instanceof Player player) || (!player.isSpectator() && !player.isCreative());
     }
 
     /** Shortest distance from a point to an axis-aligned box (0 when the point is inside). */

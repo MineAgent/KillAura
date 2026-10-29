@@ -27,7 +27,42 @@ class AuraSettingsPatchTest {
         // Untouched fields keep their values.
         assertEquals(360.0, candidate.fov);
         assertEquals("closest", candidate.priority);
+        assertTrue(candidate.attackHostile);
+        assertFalse(candidate.attackFriendlyDrops);
         assertEquals(3.0, settings.range);
+    }
+
+    @Test
+    void patchesAttackSwitchesAndTargetLists() {
+        AuraSettings candidate = new AuraSettings().copy();
+
+        List<String> errors = candidate.applyPatch(json("""
+                {
+                  "attackHostile": false,
+                  "attackFriendlyDrops": true,
+                  "attackFriendlyNoDrops": true,
+                  "denyTargets": ["ZOMBIE", "minecraft:zombie", "minecraft:player"],
+                  "alwaysTargets": ["creeper"]
+                }
+                """));
+
+        assertTrue(errors.isEmpty(), errors.toString());
+        assertFalse(candidate.attackHostile);
+        assertTrue(candidate.attackFriendlyDrops);
+        assertTrue(candidate.attackFriendlyNoDrops);
+        assertEquals(List.of("minecraft:player", "minecraft:zombie"), candidate.denyTargets);
+        assertEquals(List.of("minecraft:creeper"), candidate.alwaysTargets);
+    }
+
+    @Test
+    void emptyArraysClearLists() {
+        AuraSettings candidate = new AuraSettings().copy();
+        candidate.denyTargets = List.of("minecraft:zombie");
+        candidate.alwaysTargets = List.of("minecraft:cow");
+
+        assertTrue(candidate.applyPatch(json("{\"denyTargets\":[],\"alwaysTargets\":[]}")).isEmpty());
+        assertTrue(candidate.denyTargets.isEmpty());
+        assertTrue(candidate.alwaysTargets.isEmpty());
     }
 
     @Test
@@ -56,15 +91,45 @@ class AuraSettingsPatchTest {
     }
 
     @Test
+    void rejectsRemovedLegacyTargetFields() {
+        AuraSettings candidate = new AuraSettings().copy();
+
+        List<String> errors = candidate.applyPatch(json("{\"targetHostile\":false,\"targetPassive\":true}"));
+
+        assertEquals(2, errors.size(), errors.toString());
+        assertTrue(errors.get(0).contains("attackHostile"));
+        assertTrue(errors.get(1).contains("attackFriendlyDrops"));
+    }
+
+    @Test
+    void rejectsInvalidTargetArrays() {
+        AuraSettings candidate = new AuraSettings().copy();
+
+        List<String> errors = candidate.applyPatch(json("""
+                {
+                  "denyTargets": "minecraft:zombie",
+                  "alwaysTargets": ["minecraft:cow", 5, "bad id"]
+                }
+                """));
+
+        assertEquals(3, errors.size(), errors.toString());
+        assertTrue(errors.get(0).contains("denyTargets"));
+        assertTrue(errors.get(1).contains("alwaysTargets"));
+        assertTrue(errors.get(2).contains("bad id"));
+    }
+
+    @Test
     void rejectsWrongTypes() {
         AuraSettings candidate = new AuraSettings().copy();
 
-        List<String> errors = candidate.applyPatch(json("{\"range\":\"far\",\"targetPlayers\":1,\"rotation\":5}"));
+        List<String> errors = candidate.applyPatch(json(
+                "{\"range\":\"far\",\"targetPlayers\":1,\"rotation\":5,\"attackHostile\":\"yes\"}"));
 
-        assertEquals(3, errors.size(), errors.toString());
+        assertEquals(4, errors.size(), errors.toString());
         assertEquals(3.0, candidate.range);
         assertTrue(candidate.targetPlayers);
         assertEquals("visible", candidate.rotation);
+        assertTrue(candidate.attackHostile);
     }
 
     @Test
@@ -90,10 +155,14 @@ class AuraSettingsPatchTest {
     void copyIsIndependent() {
         AuraSettings settings = new AuraSettings();
         AuraSettings candidate = settings.copy();
-        candidate.applyPatch(json("{\"range\":5.0}"));
+        candidate.applyPatch(json("""
+                {"range":5.0,"denyTargets":["minecraft:zombie"]}
+                """));
 
         assertEquals(3.0, settings.range);
         assertEquals(5.0, candidate.range);
+        assertTrue(settings.denyTargets.isEmpty());
+        assertEquals(List.of("minecraft:zombie"), candidate.denyTargets);
         assertFalse(settings == candidate);
     }
 }

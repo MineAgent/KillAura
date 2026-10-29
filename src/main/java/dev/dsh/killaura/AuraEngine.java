@@ -102,14 +102,18 @@ public final class AuraEngine {
         }
 
         LOG.info(
-                "Kill Aura {} (range {}, rotation {}, priority {}, players {}, hostile {}, passive {})",
+                "Kill Aura {} (range {}, rotation {}, priority {}, players {}, hostile {}, friendlyDrops {},"
+                        + " friendlyNoDrops {}, deny {}, always {})",
                 active ? "ON" : "OFF",
                 settings.range,
                 settings.rotation,
                 settings.priority,
                 settings.targetPlayers,
-                settings.targetHostile,
-                settings.targetPassive);
+                settings.attackHostile,
+                settings.attackFriendlyDrops,
+                settings.attackFriendlyNoDrops,
+                settings.denyTargets.size(),
+                settings.alwaysTargets.size());
     }
 
     public void toggle() {

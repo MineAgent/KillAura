@@ -31,7 +31,7 @@ public final class Help {
                     "enabled": true,
                     "inWorld": true,
                     "player": "DSH",
-                    "config": { "range": 3.0, "rotation": "visible", ... },
+                    "config": { "range": 3.0, "attackHostile": true, ... },
                     "target": { "name": "Zombie", "id": 123, "distance": 2.31, "health": 20.0 },
                     "lastAttack": { "name": "Zombie", "agoMs": 120 }
                   }
@@ -41,14 +41,42 @@ public final class Help {
                 配置 patch
                 --------------------------------------------------------
                   请求体是 JSON 对象, 只改出现的字段:
-                    { "range": 4.5, "rotation": "visible", "targetPlayers": false }
+                    {
+                      "range": 4.5,
+                      "attackHostile": true,
+                      "attackFriendlyDrops": false,
+                      "denyTargets": ["minecraft:creeper"],
+                      "alwaysTargets": ["minecraft:player"]
+                    }
                   数字: range 0.5-6.0, fov 1-360, minAttackCharge 0-1
-                  布尔: targetPlayers, targetHostile, targetPassive, targetArmorStands,
-                        ignoreInvisible, throughWalls, pauseInScreens, pauseWhileUsingItem
+                  布尔: targetPlayers, attackHostile, attackFriendlyDrops,
+                        attackFriendlyNoDrops, targetArmorStands, ignoreInvisible,
+                        throughWalls, pauseInScreens, pauseWhileUsingItem
+                  字符串数组: denyTargets, alwaysTargets = 实体类型 ID
+                        如 minecraft:zombie, minecraft:player, 可省略 minecraft: 前缀
                   字符串: rotation = silent|visible|none
                           priority = closest|lowestHealth|health|angle
                   全有或全无: 任一字段非法则整个请求返回 400, 文件不改。
                   _help 只读; 未知字段报错。
+
+                目标规则
+                --------------------------------------------------------
+                  判定优先级:
+                    denyTargets
+                    > alwaysTargets
+                    > targetPlayers / targetArmorStands / ignoreInvisible / throughWalls
+                    > attackHostile / attackFriendlyDrops / attackFriendlyNoDrops
+
+                  denyTargets   永不攻击; 和 alwaysTargets 同时命中时拒绝优先
+                  alwaysTargets 强制合法并优先选中; 绕过 targetPlayers、targetArmorStands、
+                                ignoreInvisible、throughWalls 的视线检查, 但仍受 range、fov、
+                                暂停、攻击蓄力限制
+                  hostile       始终会主动攻击玩家的生物
+                  neutral       条件敌对 (猪灵、末影人、狼、蜜蜂、铁傀儡等); 三个攻击开关
+                                都不打, 只能靠 alwaysTargets 点名
+                  friendlyDrops 友善且默认战利品表非空 (牛、猪、羊、猫、马、雪傀儡等)
+                  friendlyNoDrops 友善且默认战利品表为空 (村民、蝙蝠、骆驼、狐狸等)
+                  蜘蛛/洞穴蜘蛛按光照: 亮处中立, 暗处敌意。
 
                 示例
                   curl http://127.0.0.1:3420/ka/state
@@ -57,7 +85,7 @@ public final class Help {
                   curl -X POST http://127.0.0.1:3420/ka/toggle
                   curl -X POST http://127.0.0.1:3420/ka/reload
                   curl -X POST -H 'Content-Type: application/json' \\
-                       --data-binary '{"range":4.5}' \\
+                       --data-binary '{"range":4.5,"attackHostile":true}' \\
                        http://127.0.0.1:3420/ka/config
                   curl http://127.0.0.1:3420/           # 所有 endpoint
 

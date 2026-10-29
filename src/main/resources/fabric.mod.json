@@ -3,7 +3,7 @@
   "id": "killaura-reimpl",
   "version": "${version}",
   "name": "Kill Aura (Reimplementation)",
-  "description": "Client-side kill aura: automatically attacks living entities in reach with full-charge hits. Controlled over HTTP at 127.0.0.1:3420/ka by MGHttpdProvider; settings live in config/killaura.json.",
+  "description": "Client-side kill aura: automatically attacks selected living entities in reach. Target rules (hostile, neutral, friendly with/without drops, deny/always lists) live in config/killaura.json and are controlled over HTTP at 127.0.0.1:3420/ka by MGHttpdProvider.",
   "authors": ["DSH"],
   "license": "LGPL-3.0-only",
   "environment": "client",

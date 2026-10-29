@@ -7,7 +7,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import java.io.Reader;
+import com.google.gson.JsonParser;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,15 +16,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeSet;
+import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Persistent settings, serialized to {@code config/killaura.json}.
  *
- * <p>The field names are kept identical to the original mod's file so an existing configuration
- * can be dropped in unchanged. Every load is sanitized and written back, which also creates the
- * file with defaults on first launch.
+ * <p>The field names are intentionally not identical to the original mod any more: the target
+ * model was split into hostile / neutral / friendly-with-drops / friendly-without-drops. Legacy
+ * {@code targetHostile} and {@code targetPassive} fields are migrated once and removed on write.
  */
 public final class AuraSettings {
     private static final Logger LOG = LoggerFactory.getLogger("Kill Aura");
@@ -38,14 +40,23 @@ public final class AuraSettings {
     private static final double MAX_FOV = 360.0;
     private static final double DEFAULT_CHARGE = 0.0;
 
-    public String _help = "range: attack reach in blocks (0.5-6.0, vanilla is 3.0) | rotation: silent, visible, none"
+    private static final String HELP = "range: attack reach in blocks (0.5-6.0, vanilla is 3.0)"
+            + " | rotation: silent, visible, none"
             + " | priority: closest, lowestHealth, angle | fov: 360 = no angle limit"
-            + " | minAttackCharge: 0.0 = attack whenever possible, 1.0 = only full-charge hits";
+            + " | minAttackCharge: 0.0 = attack whenever possible, 1.0 = only full-charge hits"
+            + " | attackHostile: always-hostile mobs | attackFriendlyDrops: harmless mobs that may drop loot"
+            + " | attackFriendlyNoDrops: harmless mobs with an empty loot table"
+            + " | denyTargets/alwaysTargets: entity type IDs, e.g. minecraft:zombie";
+
+    public String _help = HELP;
 
     public double range = DEFAULT_RANGE;
     public boolean targetPlayers = true;
-    public boolean targetHostile = true;
-    public boolean targetPassive = false;
+    public boolean attackHostile = true;
+    public boolean attackFriendlyDrops = false;
+    public boolean attackFriendlyNoDrops = false;
+    public List<String> denyTargets = new ArrayList<>();
+    public List<String> alwaysTargets = new ArrayList<>();
     public boolean targetArmorStands = false;
     public boolean ignoreInvisible = false;
     public boolean throughWalls = false;
@@ -57,11 +68,17 @@ public final class AuraSettings {
     public boolean pauseWhileUsingItem = true;
 
     public static AuraSettings fromFile(Path file) {
-        AuraSettings loaded = null;
+        JsonObject raw = null;
         try {
             if (Files.exists(file)) {
-                try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-                    loaded = GSON.fromJson(reader, AuraSettings.class);
+                String text = Files.readString(file, StandardCharsets.UTF_8).strip();
+                if (!text.isEmpty()) {
+                    JsonElement parsed = JsonParser.parseString(text);
+                    if (parsed.isJsonObject()) {
+                        raw = parsed.getAsJsonObject();
+                    } else if (!parsed.isJsonNull()) {
+                        throw new IllegalArgumentException("root must be a JSON object");
+                    }
                 }
             }
         } catch (Exception e) {
@@ -69,7 +86,20 @@ public final class AuraSettings {
             return new AuraSettings();
         }
 
-        AuraSettings result = loaded != null ? loaded : new AuraSettings();
+        AuraSettings result;
+        try {
+            result = raw == null ? new AuraSettings() : GSON.fromJson(raw, AuraSettings.class);
+        } catch (Exception e) {
+            LOG.warn("Could not parse {}, using defaults: {}", file, e.toString());
+            return new AuraSettings();
+        }
+        if (result == null) {
+            result = new AuraSettings();
+        }
+        result._help = HELP;
+        if (raw != null) {
+            migrateLegacyFields(result, raw);
+        }
         result.normalize();
         result.toFile(file);
         return result;
@@ -99,8 +129,11 @@ public final class AuraSettings {
                 case "fov" -> fov = number(errors, key, value, fov, MIN_FOV, MAX_FOV);
                 case "minAttackCharge" -> minAttackCharge = number(errors, key, value, minAttackCharge, 0.0, 1.0);
                 case "targetPlayers" -> targetPlayers = bool(errors, key, value, targetPlayers);
-                case "targetHostile" -> targetHostile = bool(errors, key, value, targetHostile);
-                case "targetPassive" -> targetPassive = bool(errors, key, value, targetPassive);
+                case "attackHostile" -> attackHostile = bool(errors, key, value, attackHostile);
+                case "attackFriendlyDrops" -> attackFriendlyDrops = bool(errors, key, value, attackFriendlyDrops);
+                case "attackFriendlyNoDrops" -> attackFriendlyNoDrops = bool(errors, key, value, attackFriendlyNoDrops);
+                case "denyTargets" -> denyTargets = ids(errors, key, value);
+                case "alwaysTargets" -> alwaysTargets = ids(errors, key, value);
                 case "targetArmorStands" -> targetArmorStands = bool(errors, key, value, targetArmorStands);
                 case "ignoreInvisible" -> ignoreInvisible = bool(errors, key, value, ignoreInvisible);
                 case "throughWalls" -> throughWalls = bool(errors, key, value, throughWalls);
@@ -108,6 +141,9 @@ public final class AuraSettings {
                 case "pauseWhileUsingItem" -> pauseWhileUsingItem = bool(errors, key, value, pauseWhileUsingItem);
                 case "rotation" -> rotation = rotation(errors, value, rotation);
                 case "priority" -> priority = priority(errors, value, priority);
+                case "targetHostile" -> errors.add("targetHostile was removed; use attackHostile");
+                case "targetPassive" -> errors.add(
+                        "targetPassive was removed; use attackFriendlyDrops and attackFriendlyNoDrops");
                 case "_help" -> errors.add("_help is read-only");
                 default -> errors.add("unknown field: " + key);
             }
@@ -133,6 +169,24 @@ public final class AuraSettings {
         }
     }
 
+    private static void migrateLegacyFields(AuraSettings settings, JsonObject raw) {
+        if (!raw.has("attackHostile") && isBoolean(raw, "targetHostile")) {
+            settings.attackHostile = raw.get("targetHostile").getAsBoolean();
+        }
+
+        boolean hasNewFriendly = raw.has("attackFriendlyDrops") || raw.has("attackFriendlyNoDrops");
+        if (!hasNewFriendly && isBoolean(raw, "targetPassive")) {
+            boolean passive = raw.get("targetPassive").getAsBoolean();
+            settings.attackFriendlyDrops = passive;
+            settings.attackFriendlyNoDrops = passive;
+        }
+    }
+
+    private static boolean isBoolean(JsonObject object, String key) {
+        JsonElement value = object.get(key);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isBoolean();
+    }
+
     private void normalize() {
         range = clampFinite(range, DEFAULT_RANGE, MIN_RANGE, MAX_RANGE);
         fov = clampFinite(fov, DEFAULT_FOV, MIN_FOV, MAX_FOV);
@@ -140,6 +194,47 @@ public final class AuraSettings {
 
         rotation = canonicalRotation(rotation);
         priority = canonicalPriority(priority);
+        denyTargets = normalizeIds(denyTargets, "denyTargets");
+        alwaysTargets = normalizeIds(alwaysTargets, "alwaysTargets");
+    }
+
+    private static List<String> normalizeIds(List<String> raw, String field) {
+        if (raw == null || raw.isEmpty()) {
+            return List.of();
+        }
+
+        TreeSet<String> ids = new TreeSet<>();
+        for (String entry : raw) {
+            String canonical = canonicalEntityId(entry);
+            if (canonical == null) {
+                LOG.warn("Ignoring invalid entity type ID in {}: {}", field, entry);
+            } else {
+                ids.add(canonical);
+            }
+        }
+        return List.copyOf(ids);
+    }
+
+    /**
+     * Canonicalizes an entity type ID: trims, lowercases, defaults the namespace to
+     * {@code minecraft:} and validates the identifier syntax. Existence in the entity registry is
+     * deliberately not checked, so a config written for a modded entity still loads.
+     */
+    static String canonicalEntityId(String raw) {
+        if (raw == null) {
+            return null;
+        }
+
+        String value = raw.trim().toLowerCase(Locale.ROOT);
+        if (value.isEmpty()) {
+            return null;
+        }
+        if (!value.contains(":")) {
+            value = "minecraft:" + value;
+        }
+
+        Identifier identifier = Identifier.tryParse(value);
+        return identifier == null ? null : identifier.toString();
     }
 
     private static double number(List<String> errors, String key, JsonElement value,
@@ -163,6 +258,30 @@ public final class AuraSettings {
             return current;
         }
         return value.getAsBoolean();
+    }
+
+    private static List<String> ids(List<String> errors, String key, JsonElement value) {
+        if (value == null || !value.isJsonArray()) {
+            errors.add(key + " must be an array of entity type IDs");
+            return List.of();
+        }
+
+        TreeSet<String> ids = new TreeSet<>();
+        for (JsonElement element : value.getAsJsonArray()) {
+            if (element == null || !element.isJsonPrimitive() || !element.getAsJsonPrimitive().isString()) {
+                errors.add(key + " entries must be strings");
+                continue;
+            }
+
+            String raw = element.getAsString();
+            String canonical = canonicalEntityId(raw);
+            if (canonical == null) {
+                errors.add(key + " contains an invalid entity type ID: " + raw);
+            } else {
+                ids.add(canonical);
+            }
+        }
+        return List.copyOf(ids);
     }
 
     private static String string(List<String> errors, String key, JsonElement value) {
