@@ -46,7 +46,8 @@ public final class AuraSettings {
             + " | minAttackCharge: 0.0 = attack whenever possible, 1.0 = only full-charge hits"
             + " | attackHostile: always-hostile mobs | attackFriendlyDrops: harmless mobs that may drop loot"
             + " | attackFriendlyNoDrops: harmless mobs with an empty loot table"
-            + " | denyTargets/alwaysTargets: entity type IDs, e.g. minecraft:zombie";
+            + " | denyTargets: never attack | alwaysTargetsHigh/Medium/Low/Lowest: forced target tiers"
+            + " (entity type IDs, e.g. minecraft:zombie)";
 
     public String _help = HELP;
 
@@ -56,7 +57,10 @@ public final class AuraSettings {
     public boolean attackFriendlyDrops = false;
     public boolean attackFriendlyNoDrops = false;
     public List<String> denyTargets = new ArrayList<>();
-    public List<String> alwaysTargets = new ArrayList<>();
+    public List<String> alwaysTargetsHigh = new ArrayList<>();
+    public List<String> alwaysTargetsMedium = new ArrayList<>();
+    public List<String> alwaysTargetsLow = new ArrayList<>();
+    public List<String> alwaysTargetsLowest = new ArrayList<>();
     public boolean targetArmorStands = false;
     public boolean ignoreInvisible = false;
     public boolean throughWalls = false;
@@ -133,7 +137,10 @@ public final class AuraSettings {
                 case "attackFriendlyDrops" -> attackFriendlyDrops = bool(errors, key, value, attackFriendlyDrops);
                 case "attackFriendlyNoDrops" -> attackFriendlyNoDrops = bool(errors, key, value, attackFriendlyNoDrops);
                 case "denyTargets" -> denyTargets = ids(errors, key, value);
-                case "alwaysTargets" -> alwaysTargets = ids(errors, key, value);
+                case "alwaysTargetsHigh" -> alwaysTargetsHigh = ids(errors, key, value);
+                case "alwaysTargetsMedium" -> alwaysTargetsMedium = ids(errors, key, value);
+                case "alwaysTargetsLow" -> alwaysTargetsLow = ids(errors, key, value);
+                case "alwaysTargetsLowest" -> alwaysTargetsLowest = ids(errors, key, value);
                 case "targetArmorStands" -> targetArmorStands = bool(errors, key, value, targetArmorStands);
                 case "ignoreInvisible" -> ignoreInvisible = bool(errors, key, value, ignoreInvisible);
                 case "throughWalls" -> throughWalls = bool(errors, key, value, throughWalls);
@@ -144,6 +151,9 @@ public final class AuraSettings {
                 case "targetHostile" -> errors.add("targetHostile was removed; use attackHostile");
                 case "targetPassive" -> errors.add(
                         "targetPassive was removed; use attackFriendlyDrops and attackFriendlyNoDrops");
+                case "alwaysTargets" -> errors.add(
+                        "alwaysTargets was split; use alwaysTargetsHigh, alwaysTargetsMedium,"
+                                + " alwaysTargetsLow or alwaysTargetsLowest");
                 case "_help" -> errors.add("_help is read-only");
                 default -> errors.add("unknown field: " + key);
             }
@@ -180,6 +190,22 @@ public final class AuraSettings {
             settings.attackFriendlyDrops = passive;
             settings.attackFriendlyNoDrops = passive;
         }
+
+        if (!raw.has("alwaysTargetsHigh") && raw.has("alwaysTargets")) {
+            settings.alwaysTargetsHigh = legacyIds(raw.get("alwaysTargets"));
+        }
+    }
+
+    private static List<String> legacyIds(JsonElement value) {
+        List<String> ids = new ArrayList<>();
+        if (value != null && value.isJsonArray()) {
+            for (JsonElement element : value.getAsJsonArray()) {
+                if (element != null && element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()) {
+                    ids.add(element.getAsString());
+                }
+            }
+        }
+        return ids;
     }
 
     private static boolean isBoolean(JsonObject object, String key) {
@@ -195,7 +221,10 @@ public final class AuraSettings {
         rotation = canonicalRotation(rotation);
         priority = canonicalPriority(priority);
         denyTargets = normalizeIds(denyTargets, "denyTargets");
-        alwaysTargets = normalizeIds(alwaysTargets, "alwaysTargets");
+        alwaysTargetsHigh = normalizeIds(alwaysTargetsHigh, "alwaysTargetsHigh");
+        alwaysTargetsMedium = normalizeIds(alwaysTargetsMedium, "alwaysTargetsMedium");
+        alwaysTargetsLow = normalizeIds(alwaysTargetsLow, "alwaysTargetsLow");
+        alwaysTargetsLowest = normalizeIds(alwaysTargetsLowest, "alwaysTargetsLowest");
     }
 
     private static List<String> normalizeIds(List<String> raw, String field) {

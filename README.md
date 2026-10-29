@@ -12,13 +12,13 @@ Minecraft **26.2** / Fabric 客户端模组，行为复刻自 `killaura-fabric-2
 ## 构建与安装
 
 ```bash
-./gradlew build          # 产物：build/libs/killaura-reimpl-1.2.0.jar
+./gradlew build          # 产物：build/libs/killaura-reimpl-1.3.0.jar
 ./gradlew test           # 单元测试（角度、距离、配置、JSON、目标规则）
 ```
 
 - JDK 25（`options.release = 25`）
 - 运行时需要：Fabric Loader ≥ 0.19、**Fabric API**（26.2 版）、**MGHttpdProvider ≥ 1.1**
-- 将 `killaura-reimpl-1.2.0.jar` 放入 `.minecraft/mods/`；MGHttpdProvider 不随模组打包
+- 将 `killaura-reimpl-1.3.0.jar` 放入 `.minecraft/mods/`；MGHttpdProvider 不随模组打包
 - `fabric.mod.json` 声明依赖 `httpdprovider >= 1.1`、`fabric-lifecycle-events-v1`；
   没装 provider 时 Fabric 会直接拒绝加载
 
@@ -80,18 +80,22 @@ curl -X POST -H 'Content-Type: application/json' \
   "attackHostile": true,
   "attackFriendlyDrops": false,
   "denyTargets": ["minecraft:creeper"],
-  "alwaysTargets": ["minecraft:player"]
+  "alwaysTargetsHigh": ["minecraft:player"],
+  "alwaysTargetsMedium": [],
+  "alwaysTargetsLow": [],
+  "alwaysTargetsLowest": []
 }
 ```
 
 - 数字：`range` 0.5–6.0、`fov` 1–360、`minAttackCharge` 0–1，必须是有限数字
 - 布尔：`targetPlayers`、`attackHostile`、`attackFriendlyDrops`、`attackFriendlyNoDrops`、
   `targetArmorStands`、`ignoreInvisible`、`throughWalls`、`pauseInScreens`、`pauseWhileUsingItem`
-- 字符串数组：`denyTargets`、`alwaysTargets`，元素是实体类型 ID（如 `minecraft:zombie`，
-  可省略 `minecraft:` 前缀）。只做语法校验，拼错的合法 ID 不会匹配任何实体
+- 字符串数组：`denyTargets`、`alwaysTargetsHigh`、`alwaysTargetsMedium`、`alwaysTargetsLow`、
+  `alwaysTargetsLowest`，元素是实体类型 ID（如 `minecraft:zombie`，可省略 `minecraft:` 前缀）。
+  只做语法校验，拼错的合法 ID 不会匹配任何实体
 - 字符串：`rotation` = `silent|visible|none`；`priority` = `closest|lowestHealth|health|angle`
 - **全有或全无**：任一字段非法则 400，文件不写；`_help` 只读，未知字段报错
-- 旧字段 `targetHostile` / `targetPassive` 已移除；HTTP 里再传会 400 并提示新字段
+- 旧字段 `targetHostile` / `targetPassive` / `alwaysTargets` 已移除；HTTP 里再传会 400 并提示新字段
 - 与文件加载不同，HTTP patch 严格拒绝越界值，不静默夹紧
 
 ### 返回码
@@ -116,12 +120,12 @@ curl -X POST -H 'Content-Type: application/json' \
 |---|---|
 | 控制 | 仅 HTTP（`/ka/on`、`/ka/off`、`/ka/toggle`），无按键 |
 | 触发条件 | 存活、非旁观、攻击冷却 ≥ `minAttackCharge`、未暂停 |
-| 目标 | 视线/距离内符合条件的 `LivingEntity`，按分类开关和两个数组筛选 |
+| 目标 | 视线/距离内符合条件的 `LivingEntity`，按分类开关和四个 always 数组筛选 |
 | 攻击 | `MultiPlayerGameMode#attack` + 主手 swing |
 | 转向 | `silent` 发 `ServerboundMovePlayerPacket.Rot`；`visible` 直接改本地 yaw/pitch；`none` 不转向 |
 | 选目标 | 包围盒最近点距离 ≤ `range`；可选 FOV、隔墙、隐身、玩家/盔甲架过滤 |
 | 优先级 | `closest`（距离）、`lowestHealth`（血量×1000+距离）、`angle`（偏角×1000+距离） |
-| 强制目标 | 只要存在合法的 `alwaysTargets` 目标，就只在强制目标中按 `priority` 选一个 |
+| 强制目标 | 按 `alwaysTargetsHigh` > 普通敌意 > `alwaysTargetsMedium` > 普通友善有掉落 > `alwaysTargetsLow` > 普通友善无掉落 > `alwaysTargetsLowest` 选择；同档内用 `priority` |
 
 ### 目标分类
 
@@ -137,16 +141,19 @@ curl -X POST -H 'Content-Type: application/json' \
   `camel_husk`、`nautilus`、`copper_golem` 归友善有掉落；`happy_ghast` 归友善无掉落。
 - `spider` / `cave_spider` 按 `getLightLevelDependentMagicValue() >= 0.5` 动态判定：
   亮处中立、暗处敌意。与原版 `SpiderTargetGoal` 一致；白天被打仍会反击。
-- 中立生物不受三个攻击开关控制，只能用 `alwaysTargets` 点名攻击。
+- 中立生物不受三个攻击开关控制，只能用 `alwaysTargets*` 数组点名攻击。
 - 无掉落判定取自 26.2 客户端 jar 的 `data/minecraft/loot_table/entities/*.json`：
   `pools` 为空即无掉落。只统计默认战利品表，不统计玩家给坐骑/宠物穿戴的鞍、马铠、狼铠、挽具等装备。
+- 所有硬编码分类/掉落数据、提取脚本和复现命令见
+  [docs/HARDCODED_DATA.md](docs/HARDCODED_DATA.md)。
 
 ### 配置 `config/killaura.json`
 
 目标字段已不再与原模组一致。旧文件里的 `targetHostile` / `targetPassive` 会自动迁移：
 `targetHostile` → `attackHostile`；`targetPassive=true` → 两个 friendly 开关都开。
-旧字段和 `showToggleMessage` 会在下次写回时移除。旧 `targetPassive` 里包含的条件敌对生物
-（末影人、狼、猪灵等）现在归中立，默认不再被攻击，需要时请加入 `alwaysTargets`。
+旧 `alwaysTargets` 会自动迁移到 `alwaysTargetsHigh`。旧字段和 `showToggleMessage` 会在下次写回时移除。
+旧 `targetPassive` 里包含的条件敌对生物（末影人、狼、猪灵等）现在归中立，默认不再被攻击，
+需要时请加入对应的 `alwaysTargets*` 数组。
 
 | 字段 | 默认 | 含义 |
 |---|---|---|
@@ -160,24 +167,42 @@ curl -X POST -H 'Content-Type: application/json' \
 | `attackFriendlyDrops` | `false` | 攻击友善且有掉落目标 |
 | `attackFriendlyNoDrops` | `false` | 攻击友善且无掉落目标 |
 | `denyTargets` | `[]` | 永不攻击的实体类型 ID 数组 |
-| `alwaysTargets` | `[]` | 强制攻击并优先选中的实体类型 ID 数组 |
+| `alwaysTargetsHigh` | `[]` | 最高优先级强制目标 |
+| `alwaysTargetsMedium` | `[]` | 高于普通友善有掉落、低于普通敌意的强制目标 |
+| `alwaysTargetsLow` | `[]` | 高于普通友善无掉落、低于普通友善有掉落的强制目标 |
+| `alwaysTargetsLowest` | `[]` | 最低优先级强制目标 |
 | `targetArmorStands` | `false` | 攻击盔甲架 |
 | `ignoreInvisible` | `false` | 忽略隐身目标（所有类型，包括盔甲架） |
 | `throughWalls` | `false` | 无视视线遮挡 |
 | `pauseInScreens` | `true` | 打开界面时暂停 |
 | `pauseWhileUsingItem` | `true` | 使用物品时暂停 |
 
-判定优先级：
+是否攻击的判定优先级不变：
 
-1. `denyTargets`：命中即永不攻击；与 `alwaysTargets` 同时命中时拒绝优先。
-2. `alwaysTargets`：强制合法并优先选中；绕过 `targetPlayers`、`targetArmorStands`、
+1. `denyTargets`：命中即永不攻击；与任一 `alwaysTargets*` 同时命中时拒绝优先。
+2. 任一 `alwaysTargets*`：强制合法；绕过 `targetPlayers`、`targetArmorStands`、
    `ignoreInvisible`、`throughWalls` 的视线检查，但仍受 `range`、`fov`、暂停、蓄力限制。
 3. `targetPlayers` / `targetArmorStands` / `ignoreInvisible` / `throughWalls`：普通目标过滤。
 4. `attackHostile` / `attackFriendlyDrops` / `attackFriendlyNoDrops`：最后按分类决定。
 
+多个合法目标的选择顺序：
+
+1. `alwaysTargetsHigh`
+2. 普通敌意目标
+3. `alwaysTargetsMedium`
+4. 普通友善有掉落目标
+5. `alwaysTargetsLow`
+6. 普通友善无掉落目标
+7. `alwaysTargetsLowest`
+
+“普通 xxx 目标”指被对应攻击开关匹配到、且不在任一 `alwaysTargets*` 数组中的目标。
+同一档位内才按 `priority` 评分选择；档位更高者即使评分更差也优先。
+玩家/盔甲架没进 always 数组时按“友善无掉落”档位排序，是否可打仍只看
+`targetPlayers` / `targetArmorStands`。
+
 数组元素是精确的实体类型 ID（如 `minecraft:zombie`、`minecraft:player`、`minecraft:armor_stand`），
-不匹配子类型、标签或 UUID；可省略 `minecraft:` 前缀。文件加载时非法 ID 会被丢弃，
-HTTP patch 中非法 ID 返回 400 且整个 patch 不写回。
+不匹配子类型、标签或 UUID；可省略 `minecraft:` 前缀。同一 ID 出现在多个 always 数组时最高档生效。
+文件加载时非法 ID 会被丢弃，HTTP patch 中非法 ID 返回 400 且整个 patch 不写回。
 
 配置在首次启动时自动生成；开启（`/ka/on`）时会重新读取一次，非法值夹紧/规范化后写回。
 运行中手改文件后调用 `/ka/reload` 生效。开关状态不持久化，重启后为关闭。
@@ -192,28 +217,31 @@ HTTP patch 中非法 ID 返回 400 且整个 patch 不写回。
 - 26.2 中 `MultiPlayerGameMode#attack` 已负责攻击包，`LocalPlayer#swing` 负责挥手包，
   无需额外 `ServerboundPunchPacket`。
 - 模组 id 为 `killaura-reimpl`，可与原模组区分；配置文件仍叫 `killaura.json`，
-  旧 `targetHostile` / `targetPassive` 会自动迁移。
+  旧 `targetHostile` / `targetPassive` / `alwaysTargets` 会自动迁移。
 
 ## 验证
 
-单元测试 45 个（`AnglesTest`、`AuraSettingsTest`、`AuraSettingsPatchTest`、`AuraSnapshotTest`、
+单元测试 51 个（`AnglesTest`、`AuraSettingsTest`、`AuraSettingsPatchTest`、`AuraSnapshotTest`、
 `TargetClassifierTest`、`TargetFilterTest`、`TargetRulesTest`）全部通过。
 
 用 `~/Documents/spMC/26.2Fabric-AutoEnterTestSave.sh`（HMCL 26.2-Fabric，带 Fabric API 0.160.0+26.2、
 MGHttpdProvider 1.1.1、mcctl）以 Xvfb 无头启动，实测：
 
-- 旧配置自动迁移：写回 `attackHostile` / `attackFriendlyDrops` / `attackFriendlyNoDrops` /
-  `denyTargets` / `alwaysTargets`，不再出现 `targetHostile` / `targetPassive`；`_help` 也刷新为新文本
+- 旧配置自动迁移：`targetHostile` / `targetPassive` / `alwaysTargets` 被写回新字段，
+  旧 `alwaysTargets` 进入 `alwaysTargetsHigh`；`_help` 刷新为新文本
 - `POST /ka/config` 合法 patch 立即生效并同步写回 `~/.minecraft/config/killaura.json`
 - 非法 patch（数组类型错误、非法实体 ID、旧字段）返回 400 且文件不变；`range:99`、未知字段、坏 JSON 同样 400
 - 僵尸在 `attackHostile=true` 时被选中；只开 `attackFriendlyDrops` 时目标是牛，只开
   `attackFriendlyNoDrops` 时目标是村民
-- `alwaysTargets` 中的村民优先于距离更近的牛；牛同时进入 `denyTargets` 和 `alwaysTargets` 时不被攻击
-- 狼（中立）在三个开关都开时仍不被选中，加入 `alwaysTargets` 后可被选中
+- 档位排序逐项通过：high 羊 > 普通僵尸；普通僵尸 > medium 牛；medium 牛 > 普通猪；
+  普通猪 > low 蝙蝠；low 蝙蝠 > 普通村民；普通村民 > lowest 狼；只有 lowest 狼时仍会攻击
+- `denyTargets` 优先于 `alwaysTargetsHigh`；被拒绝的高档目标不会回落到普通档位
+- 玩家/盔甲架未进 always 时按友善无掉落档排序：low 蝙蝠优先于普通盔甲架，没有蝙蝠时才选盔甲架
+- 狼（中立）在三个开关都开时仍不被选中，加入 always 数组后可被选中
 - 蜘蛛白天/亮处为 `target:null`，夜晚/暗处被 `attackHostile` 选中
 - `sulfur_cube` 被 `attackHostile` 选中；`mannequin` 默认不被选中
-- 测试结束已恢复默认配置、清空两个数组、关闭开关、清理测试生物；
-  **`killaura-reimpl-1.2.0.jar` 保留安装在 `~/.minecraft/mods/`**
+- 测试结束已恢复默认配置、清空五个数组、关闭开关、清理测试生物；
+  **`killaura-reimpl-1.3.0.jar` 保留安装在 `~/.minecraft/mods/`**
 
 无头环境没有人工按键操作，但按键已经从代码中移除，实测通过 HTTP 完成全部控制。
 
@@ -225,12 +253,13 @@ src/main/java/dev/dsh/killaura/
 ├── AuraEndpoint.java    # HTTP 路由、客户端线程投递、JSON 响应
 ├── AuraSnapshot.java    # 状态 JSON 数据模型
 ├── AuraEngine.java      # 每 tick 状态机：开关、瞄准、攻击、最近命中记录
-├── TargetFilter.java    # 目标筛选、强制目标优先与评分
+├── TargetFilter.java    # 目标筛选、七档选择与档位内评分
 ├── TargetClassifier.java # 敌意/中立/友善有掉落/友善无掉落分类
 ├── TargetRules.java     # 拒绝/强制/普通过滤/分类开关的判定顺序
 ├── Angles.java          # yaw/pitch 与偏角计算
 ├── AuraSettings.java    # Gson 配置读写、迁移、夹紧与严格 patch 校验
 └── Help.java            # GET /ka/ 的手册
+docs/HARDCODED_DATA.md   # 硬编码分类/掉落数据的来源与复现方法
 ka                       # curl 封装脚本
 libs/httpdprovider-1.1.1.jar  # compileOnly，不打包
 ```

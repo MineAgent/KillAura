@@ -31,7 +31,7 @@ public final class TargetFilter {
 
         LivingEntity best = null;
         double bestScore = Double.POSITIVE_INFINITY;
-        boolean bestForced = false;
+        TargetRules.Tier bestTier = null;
 
         for (LivingEntity candidate : nearby) {
             AABB box = candidate.getBoundingBox();
@@ -50,17 +50,19 @@ public final class TargetFilter {
                 continue;
             }
 
-            boolean forced = settings.alwaysTargets.contains(id);
+            boolean forced = TargetRules.isAlwaysTarget(id, settings);
             boolean lineOfSight = forced || settings.throughWalls || self.hasLineOfSight(candidate);
+            boolean player = candidate instanceof Player;
+            boolean armorStand = candidate instanceof ArmorStand;
+            TargetClassifier.Kind kind = TargetClassifier.classify(candidate);
             TargetRules.Decision decision = TargetRules.evaluate(
-                    id,
-                    candidate instanceof Player,
-                    candidate instanceof ArmorStand,
-                    candidate.isInvisible(),
-                    lineOfSight,
-                    TargetClassifier.classify(candidate),
-                    settings);
+                    id, player, armorStand, candidate.isInvisible(), lineOfSight, kind, settings);
             if (decision == TargetRules.Decision.DENY) {
+                continue;
+            }
+
+            TargetRules.Tier tier = TargetRules.tierFor(id, kind, player, armorStand, settings);
+            if (tier == null) {
                 continue;
             }
 
@@ -70,11 +72,10 @@ public final class TargetFilter {
                 default -> gap;
             };
 
-            boolean isForced = decision == TargetRules.Decision.FORCE;
-            if (best == null || isBetter(isForced, score, bestForced, bestScore)) {
+            if (best == null || isBetter(tier, score, bestTier, bestScore)) {
                 best = candidate;
                 bestScore = score;
-                bestForced = isForced;
+                bestTier = tier;
             }
         }
 
@@ -82,11 +83,16 @@ public final class TargetFilter {
     }
 
     /**
-     * True when a forced target should replace the current best, or when two candidates of the
-     * same class are compared by the configured priority score.
+     * Compares two legal candidates: a better (lower) tier always wins; inside the same tier the
+     * configured priority score decides.
      */
-    static boolean isBetter(boolean forced, double score, boolean currentForced, double currentScore) {
-        return forced != currentForced ? forced : score < currentScore;
+    static boolean isBetter(TargetRules.Tier tier, double score,
+                            TargetRules.Tier currentTier, double currentScore) {
+        if (currentTier == null) {
+            return true;
+        }
+        int byTier = tier.compareTo(currentTier);
+        return byTier < 0 || (byTier == 0 && score < currentScore);
     }
 
     private static boolean baseEligible(LocalPlayer self, LivingEntity entity) {

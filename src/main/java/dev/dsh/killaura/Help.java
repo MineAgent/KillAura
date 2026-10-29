@@ -46,13 +46,17 @@ public final class Help {
                       "attackHostile": true,
                       "attackFriendlyDrops": false,
                       "denyTargets": ["minecraft:creeper"],
-                      "alwaysTargets": ["minecraft:player"]
+                      "alwaysTargetsHigh": ["minecraft:player"],
+                      "alwaysTargetsMedium": [],
+                      "alwaysTargetsLow": [],
+                      "alwaysTargetsLowest": []
                     }
                   数字: range 0.5-6.0, fov 1-360, minAttackCharge 0-1
                   布尔: targetPlayers, attackHostile, attackFriendlyDrops,
                         attackFriendlyNoDrops, targetArmorStands, ignoreInvisible,
                         throughWalls, pauseInScreens, pauseWhileUsingItem
-                  字符串数组: denyTargets, alwaysTargets = 实体类型 ID
+                  字符串数组: denyTargets, alwaysTargetsHigh, alwaysTargetsMedium,
+                        alwaysTargetsLow, alwaysTargetsLowest = 实体类型 ID
                         如 minecraft:zombie, minecraft:player, 可省略 minecraft: 前缀
                   字符串: rotation = silent|visible|none
                           priority = closest|lowestHealth|health|angle
@@ -61,19 +65,32 @@ public final class Help {
 
                 目标规则
                 --------------------------------------------------------
-                  判定优先级:
+                  是否攻击的判定顺序:
                     denyTargets
-                    > alwaysTargets
+                    > 任一 alwaysTargets* 数组
                     > targetPlayers / targetArmorStands / ignoreInvisible / throughWalls
                     > attackHostile / attackFriendlyDrops / attackFriendlyNoDrops
 
-                  denyTargets   永不攻击; 和 alwaysTargets 同时命中时拒绝优先
-                  alwaysTargets 强制合法并优先选中; 绕过 targetPlayers、targetArmorStands、
+                  多个合法目标的选择顺序:
+                    alwaysTargetsHigh
+                    > 普通敌意目标
+                    > alwaysTargetsMedium
+                    > 普通友善有掉落目标
+                    > alwaysTargetsLow
+                    > 普通友善无掉落目标
+                    > alwaysTargetsLowest
+                  "普通 xxx 目标" 指被对应开关匹配到, 且不在任一 alwaysTargets*
+                  数组中的目标; 同一档位内仍按 priority 选。
+                  玩家/盔甲架没进 always 列表时按"友善无掉落"档位排序,
+                  是否可打仍只看 targetPlayers / targetArmorStands。
+
+                  denyTargets   永不攻击; 和 alwaysTargets* 同时命中时拒绝优先
+                  alwaysTargets* 强制合法; 绕过 targetPlayers、targetArmorStands、
                                 ignoreInvisible、throughWalls 的视线检查, 但仍受 range、fov、
                                 暂停、攻击蓄力限制
                   hostile       始终会主动攻击玩家的生物
                   neutral       条件敌对 (猪灵、末影人、狼、蜜蜂、铁傀儡等); 三个攻击开关
-                                都不打, 只能靠 alwaysTargets 点名
+                                都不打, 只能靠 alwaysTargets* 点名
                   friendlyDrops 友善且默认战利品表非空 (牛、猪、羊、猫、马、雪傀儡等)
                   friendlyNoDrops 友善且默认战利品表为空 (村民、蝙蝠、骆驼、狐狸等)
                   蜘蛛/洞穴蜘蛛按光照: 亮处中立, 暗处敌意。
@@ -103,6 +120,7 @@ public final class Help {
                 注意
                   - 只监听 127.0.0.1, 没有鉴权, 不要把这个端口暴露出去。
                   - 开关状态不持久化, 重启客户端后是关闭的。
+                  - 旧 alwaysTargets 会自动迁移到 alwaysTargetsHigh。
                   - 开启时会重新读取一次 config/killaura.json; 运行中改文件后用 /ka/reload。
                   - pauseInScreens=true 时打开任意界面会暂停攻击; pauseWhileUsingItem=true
                     时使用物品会暂停。

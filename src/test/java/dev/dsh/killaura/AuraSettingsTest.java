@@ -31,7 +31,10 @@ class AuraSettingsTest {
         assertFalse(settings.attackFriendlyDrops);
         assertFalse(settings.attackFriendlyNoDrops);
         assertTrue(settings.denyTargets.isEmpty());
-        assertTrue(settings.alwaysTargets.isEmpty());
+        assertTrue(settings.alwaysTargetsHigh.isEmpty());
+        assertTrue(settings.alwaysTargetsMedium.isEmpty());
+        assertTrue(settings.alwaysTargetsLow.isEmpty());
+        assertTrue(settings.alwaysTargetsLowest.isEmpty());
         assertFalse(settings.targetArmorStands);
     }
 
@@ -87,25 +90,46 @@ class AuraSettingsTest {
         assertTrue(written.contains("\"_help\""));
         assertTrue(written.contains("\"attackHostile\": true"));
         assertTrue(written.contains("\"denyTargets\": []"));
+        assertTrue(written.contains("\"alwaysTargetsHigh\": []"));
     }
 
     @Test
     void migratesLegacyTargetFields() throws Exception {
         Path file = dir.resolve("killaura.json");
         Files.writeString(file,
-                "{\"targetHostile\": false, \"targetPassive\": true, \"showToggleMessage\": false}",
+                "{\"targetHostile\": false, \"targetPassive\": true,"
+                        + " \"alwaysTargets\": [\"creeper\"], \"showToggleMessage\": false}",
                 StandardCharsets.UTF_8);
 
         AuraSettings settings = AuraSettings.fromFile(file);
         assertFalse(settings.attackHostile);
         assertTrue(settings.attackFriendlyDrops);
         assertTrue(settings.attackFriendlyNoDrops);
+        assertEquals(List.of("minecraft:creeper"), settings.alwaysTargetsHigh);
 
         String written = Files.readString(file, StandardCharsets.UTF_8);
         assertFalse(written.contains("targetHostile"));
         assertFalse(written.contains("targetPassive"));
+        assertFalse(written.contains("\"alwaysTargets\":"));
         assertFalse(written.contains("showToggleMessage"));
         assertTrue(written.contains("\"attackHostile\": false"));
+    }
+
+    @Test
+    void newAlwaysHighWinsOverLegacyAlwaysTargets() throws Exception {
+        Path file = dir.resolve("killaura.json");
+        Files.writeString(file, """
+                {
+                  "alwaysTargets": ["minecraft:cow"],
+                  "alwaysTargetsHigh": ["minecraft:zombie"]
+                }
+                """, StandardCharsets.UTF_8);
+
+        AuraSettings settings = AuraSettings.fromFile(file);
+        assertEquals(List.of("minecraft:zombie"), settings.alwaysTargetsHigh);
+
+        String written = Files.readString(file, StandardCharsets.UTF_8);
+        assertFalse(written.contains("\"alwaysTargets\":"));
     }
 
     @Test
@@ -133,23 +157,40 @@ class AuraSettingsTest {
         Files.writeString(file, """
                 {
                   "denyTargets": ["ZOMBIE", "minecraft:zombie", "minecraft:player", "Bad ID"],
-                  "alwaysTargets": ["creeper", "minecraft:creeper"]
+                  "alwaysTargetsHigh": ["creeper", "minecraft:creeper"],
+                  "alwaysTargetsMedium": ["COW"],
+                  "alwaysTargetsLow": ["bat"],
+                  "alwaysTargetsLowest": ["ZOMBIE"]
                 }
                 """, StandardCharsets.UTF_8);
 
         AuraSettings settings = AuraSettings.fromFile(file);
         assertEquals(List.of("minecraft:player", "minecraft:zombie"), settings.denyTargets);
-        assertEquals(List.of("minecraft:creeper"), settings.alwaysTargets);
+        assertEquals(List.of("minecraft:creeper"), settings.alwaysTargetsHigh);
+        assertEquals(List.of("minecraft:cow"), settings.alwaysTargetsMedium);
+        assertEquals(List.of("minecraft:bat"), settings.alwaysTargetsLow);
+        assertEquals(List.of("minecraft:zombie"), settings.alwaysTargetsLowest);
     }
 
     @Test
     void nullListsBecomeEmpty() throws Exception {
         Path file = dir.resolve("killaura.json");
-        Files.writeString(file, "{\"denyTargets\": null, \"alwaysTargets\": null}", StandardCharsets.UTF_8);
+        Files.writeString(file, """
+                {
+                  "denyTargets": null,
+                  "alwaysTargetsHigh": null,
+                  "alwaysTargetsMedium": null,
+                  "alwaysTargetsLow": null,
+                  "alwaysTargetsLowest": null
+                }
+                """, StandardCharsets.UTF_8);
 
         AuraSettings settings = AuraSettings.fromFile(file);
         assertTrue(settings.denyTargets.isEmpty());
-        assertTrue(settings.alwaysTargets.isEmpty());
+        assertTrue(settings.alwaysTargetsHigh.isEmpty());
+        assertTrue(settings.alwaysTargetsMedium.isEmpty());
+        assertTrue(settings.alwaysTargetsLow.isEmpty());
+        assertTrue(settings.alwaysTargetsLowest.isEmpty());
     }
 
     @Test

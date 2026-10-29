@@ -42,7 +42,10 @@ class AuraSettingsPatchTest {
                   "attackFriendlyDrops": true,
                   "attackFriendlyNoDrops": true,
                   "denyTargets": ["ZOMBIE", "minecraft:zombie", "minecraft:player"],
-                  "alwaysTargets": ["creeper"]
+                  "alwaysTargetsHigh": ["creeper"],
+                  "alwaysTargetsMedium": ["COW"],
+                  "alwaysTargetsLow": ["bat"],
+                  "alwaysTargetsLowest": ["ZOMBIE"]
                 }
                 """));
 
@@ -51,18 +54,35 @@ class AuraSettingsPatchTest {
         assertTrue(candidate.attackFriendlyDrops);
         assertTrue(candidate.attackFriendlyNoDrops);
         assertEquals(List.of("minecraft:player", "minecraft:zombie"), candidate.denyTargets);
-        assertEquals(List.of("minecraft:creeper"), candidate.alwaysTargets);
+        assertEquals(List.of("minecraft:creeper"), candidate.alwaysTargetsHigh);
+        assertEquals(List.of("minecraft:cow"), candidate.alwaysTargetsMedium);
+        assertEquals(List.of("minecraft:bat"), candidate.alwaysTargetsLow);
+        assertEquals(List.of("minecraft:zombie"), candidate.alwaysTargetsLowest);
     }
 
     @Test
     void emptyArraysClearLists() {
         AuraSettings candidate = new AuraSettings().copy();
         candidate.denyTargets = List.of("minecraft:zombie");
-        candidate.alwaysTargets = List.of("minecraft:cow");
+        candidate.alwaysTargetsHigh = List.of("minecraft:cow");
+        candidate.alwaysTargetsMedium = List.of("minecraft:cow");
+        candidate.alwaysTargetsLow = List.of("minecraft:cow");
+        candidate.alwaysTargetsLowest = List.of("minecraft:cow");
 
-        assertTrue(candidate.applyPatch(json("{\"denyTargets\":[],\"alwaysTargets\":[]}")).isEmpty());
+        assertTrue(candidate.applyPatch(json("""
+                {
+                  "denyTargets": [],
+                  "alwaysTargetsHigh": [],
+                  "alwaysTargetsMedium": [],
+                  "alwaysTargetsLow": [],
+                  "alwaysTargetsLowest": []
+                }
+                """)).isEmpty());
         assertTrue(candidate.denyTargets.isEmpty());
-        assertTrue(candidate.alwaysTargets.isEmpty());
+        assertTrue(candidate.alwaysTargetsHigh.isEmpty());
+        assertTrue(candidate.alwaysTargetsMedium.isEmpty());
+        assertTrue(candidate.alwaysTargetsLow.isEmpty());
+        assertTrue(candidate.alwaysTargetsLowest.isEmpty());
     }
 
     @Test
@@ -102,19 +122,30 @@ class AuraSettingsPatchTest {
     }
 
     @Test
+    void rejectsRemovedAlwaysTargetsField() {
+        AuraSettings candidate = new AuraSettings().copy();
+
+        List<String> errors = candidate.applyPatch(json("{\"alwaysTargets\":[\"minecraft:cow\"]}"));
+
+        assertEquals(1, errors.size(), errors.toString());
+        assertTrue(errors.get(0).contains("alwaysTargetsHigh"));
+        assertTrue(candidate.alwaysTargetsHigh.isEmpty());
+    }
+
+    @Test
     void rejectsInvalidTargetArrays() {
         AuraSettings candidate = new AuraSettings().copy();
 
         List<String> errors = candidate.applyPatch(json("""
                 {
                   "denyTargets": "minecraft:zombie",
-                  "alwaysTargets": ["minecraft:cow", 5, "bad id"]
+                  "alwaysTargetsHigh": ["minecraft:cow", 5, "bad id"]
                 }
                 """));
 
         assertEquals(3, errors.size(), errors.toString());
         assertTrue(errors.get(0).contains("denyTargets"));
-        assertTrue(errors.get(1).contains("alwaysTargets"));
+        assertTrue(errors.get(1).contains("alwaysTargetsHigh"));
         assertTrue(errors.get(2).contains("bad id"));
     }
 
