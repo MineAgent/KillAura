@@ -12,7 +12,7 @@
 
 | 项 | 值 |
 |---|---|
-| 客户端 jar | `/home/DSH/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged-deobf/26.2/minecraft-merged-deobf-26.2.jar` |
+| 客户端 jar | `~/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged-deobf/26.2/minecraft-merged-deobf-26.2.jar` |
 | SHA-256 | `eaea8a3b5e1b7168cfd070216180480b21d3ea5d7e5e1832471e450ca56629f9` |
 | 实体战利品表数量 | 109 个 `data/minecraft/loot_table/entities/*.json` |
 | 提取日期 | 2026-10-29 |

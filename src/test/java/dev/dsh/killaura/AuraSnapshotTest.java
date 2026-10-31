@@ -34,14 +34,14 @@ class AuraSnapshotTest {
         AuraSnapshot snapshot = new AuraSnapshot(
                 true,
                 true,
-                "DSH",
+                "Steve",
                 new JsonObject(),
                 new AuraSnapshot.Target("Zombie", 42, 2.31, 20.0F),
                 new AuraSnapshot.LastAttack("Zombie", 120L));
 
         JsonObject json = snapshot.toJson();
 
-        assertEquals("DSH", json.get("player").getAsString());
+        assertEquals("Steve", json.get("player").getAsString());
         assertEquals("Zombie", json.getAsJsonObject("target").get("name").getAsString());
         assertEquals(42, json.getAsJsonObject("target").get("id").getAsInt());
         assertEquals(2.31, json.getAsJsonObject("target").get("distance").getAsDouble());

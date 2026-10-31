@@ -224,8 +224,8 @@ curl -X POST -H 'Content-Type: application/json' \
 单元测试 51 个（`AnglesTest`、`AuraSettingsTest`、`AuraSettingsPatchTest`、`AuraSnapshotTest`、
 `TargetClassifierTest`、`TargetFilterTest`、`TargetRulesTest`）全部通过。
 
-用 `~/Documents/spMC/26.2Fabric-AutoEnterTestSave.sh`（HMCL 26.2-Fabric，带 Fabric API 0.160.0+26.2、
-MGHttpdProvider 1.1.1、mcctl）以 Xvfb 无头启动，实测：
+用 HMCL 的 26.2-Fabric 实例（带 Fabric API 0.160.0+26.2、MGHttpdProvider 1.1.1、mcctl）
+以 Xvfb 无头启动，实测：
 
 - 旧配置自动迁移：`targetHostile` / `targetPassive` / `alwaysTargets` 被写回新字段，
   旧 `alwaysTargets` 进入 `alwaysTargetsHigh`；`_help` 刷新为新文本
