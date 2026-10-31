@@ -56,7 +56,7 @@ curl -X POST -H 'Content-Type: application/json' \
   "ok": true,
   "enabled": true,
   "inWorld": true,
-  "player": "DSH",
+  "player": "Steve",
   "config": { "range": 3.0, "attackHostile": true, "...": "..." },
   "target": { "name": "Zombie", "id": 123, "distance": 2.31, "health": 20.0 },
   "lastAttack": { "name": "Zombie", "agoMs": 120 }
