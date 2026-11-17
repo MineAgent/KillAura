@@ -84,7 +84,8 @@ public final class AuraEngine {
         }
 
         mc.gameMode.attack(player, target);
-        player.swing(InteractionHand.MAIN_HAND);
+        // Since 26.3 MultiPlayerGameMode#attack no longer swings; do what Minecraft#startAttack does.
+        player.swing(InteractionHand.MAIN_HAND, player.getMainHandItem().getAttackAnimation(), false);
 
         lastTargetName = target.getName().getString();
         lastAttackAt = System.currentTimeMillis();

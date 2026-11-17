@@ -10,13 +10,13 @@ Kill Aura (Reimplementation) 的**代码**按 **LGPL-3.0-only** 分发，**文�
 
 ## 行为来源：killaura 1.0.0（行为改编，未打包）
 
-本项目是 **Kill Aura 1.0.0**（作者 **pokato**）在 Minecraft 26.2 上的行为兼容重实现。
+本项目是 **Kill Aura 1.0.0**（作者 **pokato**）在 Minecraft 26.3 上的行为兼容重实现。
 
 - 原始产物：`killaura-fabric-26.1-26.3-1.0.0.jar`
 - SHA-256：`330bb2e070c06109707c825a215a60edf0723c5b60c920368a6685bc93dc9b2b`
 - 原始许可：MIT（`fabric.mod.json` 声明，jar 内附 `LICENSE_killaura`）
 
-本仓库没有获取到原作者源码，Java 代码是按 26.2 的官方 API 独立编写的；配置字段、目标筛选规则、
+本仓库没有获取到原作者源码，Java 代码是按 26.3 的官方 API 独立编写的；配置字段、目标筛选规则、
 评分公式与用户可见文案刻意与原模组保持一致。原模组为 MIT 许可，其许可文本复制如下。
 
 ```

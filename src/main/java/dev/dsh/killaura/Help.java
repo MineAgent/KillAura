@@ -10,7 +10,7 @@ public final class Help {
 
     public static String text() {
         return """
-                Kill Aura (reimpl) — 远程控制 (Fabric, Minecraft 26.2)
+                Kill Aura (reimpl) — 远程控制 (Fabric, Minecraft 26.3)
                 ========================================================
                 挂载地址: http://127.0.0.1:3420/ka
                 必需模组: MGHttpdProvider

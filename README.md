@@ -1,7 +1,7 @@
 # Kill Aura (Reimplementation)
 
-Minecraft **26.2** / Fabric 客户端模组，行为复刻自 `killaura-fabric-26.1-26.3-1.0.0.jar`
-（作者 pokato，MIT 许可，见 [NOTICE.md](NOTICE.md)）。代码针对 26.2 单独重写，不再包含原模组的反射兼容层。
+Minecraft **26.3** / Fabric 客户端模组，行为复刻自 `killaura-fabric-26.1-26.3-1.0.0.jar`
+（作者 pokato，MIT 许可，见 [NOTICE.md](NOTICE.md)）。代码针对 26.3 单独重写，不再包含原模组的反射兼容层。
 
 自动攻击距离内的生物。**没有游戏内按键**：开关与配置通过
 [MGHttpdProvider](https://github.com/MineAgent/HttpdProvider) 的共享 HTTP 服务
@@ -12,13 +12,13 @@ Minecraft **26.2** / Fabric 客户端模组，行为复刻自 `killaura-fabric-2
 ## 构建与安装
 
 ```bash
-./gradlew build          # 产物：build/libs/killaura-reimpl-1.3.0.jar
+./gradlew build          # 产物：build/libs/killaura-reimpl-1.3.1.jar
 ./gradlew test           # 单元测试（角度、距离、配置、JSON、目标规则）
 ```
 
 - JDK 25（`options.release = 25`）
-- 运行时需要：Fabric Loader ≥ 0.19、**Fabric API**（26.2 版）、**MGHttpdProvider ≥ 1.1**
-- 将 `killaura-reimpl-1.3.0.jar` 放入 `.minecraft/mods/`；MGHttpdProvider 不随模组打包
+- 运行时需要：Fabric Loader ≥ 0.20.1、**Fabric API**（26.3 版，0.166.2+26.3）、**MGHttpdProvider ≥ 1.1**
+- 将 `killaura-reimpl-1.3.1.jar` 放入实例的 `mods/` 目录；MGHttpdProvider 不随模组打包
 - `fabric.mod.json` 声明依赖 `httpdprovider >= 1.1`、`fabric-lifecycle-events-v1`；
   没装 provider 时 Fabric 会直接拒绝加载
 
@@ -131,18 +131,18 @@ curl -X POST -H 'Content-Type: application/json' \
 
 | 分类 | 判定 | 典型生物 |
 |---|---|---|
-| 敌意 | 实现 `Enemy` 且不是 `NeutralMob`，或属于 26.2 显式敌对例外；蜘蛛按光照 | 僵尸、骷髅、苦力怕、史莱姆、恶魂、监守者、猪灵蛮兵、疣猪兽、僵尸鹦鹉螺、硫方怪 |
+| 敌意 | 实现 `Enemy` 且不是 `NeutralMob`，或属于 26.3 显式敌对例外；蜘蛛按光照 | 僵尸、骷髅、苦力怕、史莱姆、恶魂、监守者、猪灵蛮兵、疣猪兽、僵尸鹦鹉螺、硫方怪 |
 | 中立 | 实现 `NeutralMob`，或属于条件敌对表 | 末影人、僵尸猪灵、狼、铁傀儡、北极熊、蜜蜂、猪灵、羊驼、行商羊驼、熊猫、山羊、河豚 |
 | 友善有掉落 | 友善，且默认实体战利品表非空 | 牛、猪、羊、鸡、猫、鹦鹉、马、驴、骡、雪傀儡、铜傀儡、鹦鹉螺、骆驼尸壳 |
 | 友善无掉落 | 友善，且默认实体战利品表为空 | 悦灵、犰狳、美西螈、蝙蝠、骆驼、狐狸、青蛙、快乐恶魂、豹猫、嗅探兽、蝌蚪、村民、流浪商人 |
 
 - 条件敌对表：`piglin`、`llama`、`trader_llama`、`panda`、`goat`、`pufferfish`。
-- 26.2 显式例外：`zombie_nautilus`、`sulfur_cube` 强制敌意；`mannequin` 强制中立；
+- 26.3 显式例外：`zombie_nautilus`、`sulfur_cube` 强制敌意；`mannequin` 强制中立；
   `camel_husk`、`nautilus`、`copper_golem` 归友善有掉落；`happy_ghast` 归友善无掉落。
 - `spider` / `cave_spider` 按 `getLightLevelDependentMagicValue() >= 0.5` 动态判定：
   亮处中立、暗处敌意。与原版 `SpiderTargetGoal` 一致；白天被打仍会反击。
 - 中立生物不受三个攻击开关控制，只能用 `alwaysTargets*` 数组点名攻击。
-- 无掉落判定取自 26.2 客户端 jar 的 `data/minecraft/loot_table/entities/*.json`：
+- 无掉落判定取自 26.3 客户端 jar 的 `data/minecraft/loot_table/entities/*.json`：
   `pools` 为空即无掉落。只统计默认战利品表，不统计玩家给坐骑/宠物穿戴的鞍、马铠、狼铠、挽具等装备。
 - 所有硬编码分类/掉落数据、提取脚本和复现命令见
   [docs/HARDCODED_DATA.md](docs/HARDCODED_DATA.md)。
@@ -213,9 +213,10 @@ curl -X POST -H 'Content-Type: application/json' \
 - 评分公式、判定顺序等核心行为与原模组对齐；目标分类和配置字段已扩展为
   敌意/中立/友善有掉落/友善无掉落四类，不再与原模组字段完全一致。
 - 去掉原模组的 `J` 键和 `showToggleMessage` 动作栏提示，控制改由 MGHttpdProvider 提供。
-- 原模组用反射同时兼容 26.1–26.3；本项目只面向 26.2，直接调用官方 API，因此没有 `Compat` 层。
-- 26.2 中 `MultiPlayerGameMode#attack` 已负责攻击包，`LocalPlayer#swing` 负责挥手包，
-  无需额外 `ServerboundPunchPacket`。
+- 原模组用反射同时兼容 26.1–26.3；本项目只面向 26.3，直接调用官方 API，因此没有 `Compat` 层。
+- 26.3 的 `MultiPlayerGameMode#attack` 只发 `ServerboundAttackPacket`、不再自动挥手；模组按
+  `Minecraft#startAttack` 的写法补上 `LocalPlayer#swing(MAIN_HAND, itemStack.getAttackAnimation(), false)`，
+  挥手动画由物品的 `SwingAnimation` 组件决定。`ServerboundPunchPacket` 仍然不需要。
 - 模组 id 为 `killaura-reimpl`，可与原模组区分；配置文件仍叫 `killaura.json`，
   旧 `targetHostile` / `targetPassive` / `alwaysTargets` 会自动迁移。
 
@@ -224,24 +225,21 @@ curl -X POST -H 'Content-Type: application/json' \
 单元测试 51 个（`AnglesTest`、`AuraSettingsTest`、`AuraSettingsPatchTest`、`AuraSnapshotTest`、
 `TargetClassifierTest`、`TargetFilterTest`、`TargetRulesTest`）全部通过。
 
-用 HMCL 的 26.2-Fabric 实例（带 Fabric API 0.160.0+26.2、MGHttpdProvider 1.1.1、mcctl）
+用 HMCL 的 26.3-Fabric 实例（Fabric API 0.166.2+26.3、MGHttpdProvider 1.2.1、mcctl）
 以 Xvfb 无头启动，实测：
 
-- 旧配置自动迁移：`targetHostile` / `targetPassive` / `alwaysTargets` 被写回新字段，
-  旧 `alwaysTargets` 进入 `alwaysTargetsHigh`；`_help` 刷新为新文本
-- `POST /ka/config` 合法 patch 立即生效并同步写回 `~/.minecraft/config/killaura.json`
-- 非法 patch（数组类型错误、非法实体 ID、旧字段）返回 400 且文件不变；`range:99`、未知字段、坏 JSON 同样 400
-- 僵尸在 `attackHostile=true` 时被选中；只开 `attackFriendlyDrops` 时目标是牛，只开
-  `attackFriendlyNoDrops` 时目标是村民
-- 档位排序逐项通过：high 羊 > 普通僵尸；普通僵尸 > medium 牛；medium 牛 > 普通猪；
-  普通猪 > low 蝙蝠；low 蝙蝠 > 普通村民；普通村民 > lowest 狼；只有 lowest 狼时仍会攻击
-- `denyTargets` 优先于 `alwaysTargetsHigh`；被拒绝的高档目标不会回落到普通档位
-- 玩家/盔甲架未进 always 时按友善无掉落档排序：low 蝙蝠优先于普通盔甲架，没有蝙蝠时才选盔甲架
-- 狼（中立）在三个开关都开时仍不被选中，加入 always 数组后可被选中
-- 蜘蛛白天/亮处为 `target:null`，夜晚/暗处被 `attackHostile` 选中
-- `sulfur_cube` 被 `attackHostile` 选中；`mannequin` 默认不被选中
-- 测试结束已恢复默认配置、清空五个数组、关闭开关、清理测试生物；
-  **`killaura-reimpl-1.3.0.jar` 保留安装在 `~/.minecraft/mods/`**
+- 模组在 26.3 正常加载，`/ka` 注册成功，`GET /ka/` 标题为 Minecraft 26.3
+- `POST /ka/config` 合法 patch 立即生效并同步写回实例的 `config/killaura.json`
+- 僵尸在 `attackHostile=true` 时被选中并实际攻击（`lastAttack` 有记录）
+- 只开 `attackFriendlyDrops` 时目标是牛；只开 `attackFriendlyNoDrops` 时目标是村民
+- 狼（中立）在三个开关都开时仍不被选中；加入 `alwaysTargetsHigh` 后立即被选中并攻击
+- 蜘蛛被 `attackHostile` 选中（当时光照 < 0.5）；亮/暗两态见 `TargetClassifierTest`
+- 攻击路径调用 26.3 的新 `swing` 重载，游戏日志无异常
+- 测试结束已恢复默认配置、清空五个数组、关闭开关、清理测试生物，并用暂停菜单正常退出；
+  **`killaura-reimpl-1.3.1.jar` 保留安装在 26.3 实例的 `mods/` 目录**
+
+档位排序、`denyTargets` 优先于 `alwaysTargetsHigh`、玩家/盔甲架档位、蜘蛛光照等规则由单元测试覆盖
+（51 个测试全部通过）。
 
 无头环境没有人工按键操作，但按键已经从代码中移除，实测通过 HTTP 完成全部控制。
 

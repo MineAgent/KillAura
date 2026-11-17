@@ -1,10 +1,10 @@
 # 硬编码数据来源说明
 
-本文记录 Kill Aura 代码中所有会影响目标选择/攻击行为的硬编码数据，以及它们的来源和推导方式。目标版本固定为 **Minecraft 26.2**；升级游戏版本时必须重新核对本文。
+本文记录 Kill Aura 代码中所有会影响目标选择/攻击行为的硬编码数据，以及它们的来源和推导方式。目标版本固定为 **Minecraft 26.3**；升级游戏版本时必须重新核对本文。
 
 约定：
 
-- **数据推导**：从 26.2 客户端 jar 的类/资源中取得，可复现。
+- **数据推导**：从 26.3 客户端 jar 的类/资源中取得，可复现。
 - **设计常量**：为了让模组行为可控而人为选定的值，不是游戏数据。
 - **用户规则**：由需求直接指定的优先级/顺序。
 
@@ -12,13 +12,18 @@
 
 | 项 | 值 |
 |---|---|
-| 客户端 jar | `~/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged-deobf/26.2/minecraft-merged-deobf-26.2.jar` |
-| SHA-256 | `eaea8a3b5e1b7168cfd070216180480b21d3ea5d7e5e1832471e450ca56629f9` |
+| 客户端 jar | `~/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged-deobf/26.3/minecraft-merged-deobf-26.3.jar` |
+| SHA-256 | `795a6c443be2208c36d6ef304cee83abc07160a8d049c18ae563da2501d3e736` |
 | 实体战利品表数量 | 109 个 `data/minecraft/loot_table/entities/*.json` |
-| 提取日期 | 2026-10-29 |
+| 提取日期 | 2026-11-17 |
 | 代码位置 | `src/main/java/dev/dsh/killaura/TargetClassifier.java` |
 
-`minecraft-merged-deobf-26.2.jar` 是 Loom 使用的合并/去混淆客户端+服务端 jar；类名和资源名与 26.2 官方名一致。
+`minecraft-merged-deobf-26.3.jar` 是 Loom 使用的合并/去混淆客户端+服务端 jar；类名和资源名与 26.3 官方名一致。
+
+26.2 → 26.3 的核对结果：战利品表集合完全一致（109 个表、30 个空表、每个表的 `pools` 是否为空均无变化），
+下面四个硬编码集合因此保持不变。26.3 新增的实体只有 `minecraft:cushion`（`decoration.Cushion extends BlockAttachedEntity extends Entity`，不是 `LivingEntity`，无法被选中）、
+`minecraft:poplar_boat` 与 `minecraft:poplar_chest_boat`（船，不是 `LivingEntity`），都不影响分类。
+另外 `EnderMan` 在 26.3 改名为 `Enderman`，实体 ID（`minecraft:enderman`）与行为未变。
 
 ## 1. 目标分类硬编码
 
@@ -41,14 +46,14 @@ return FRIENDLY_NO_DROPS.contains(id) ? FRIENDLY_NO_DROPS : FRIENDLY_DROPS;
 检查方式：
 
 ```bash
-JAR=$(find ~/.gradle/caches/fabric-loom/minecraftMaven -name 'minecraft-merged-deobf-26.2.jar' | head -1)
+JAR=$(find ~/.gradle/caches/fabric-loom/minecraftMaven -name 'minecraft-merged-deobf-26.3.jar' | head -1)
 javap -classpath "$JAR" net.minecraft.world.entity.monster.Monster
 javap -classpath "$JAR" net.minecraft.world.entity.animal.wolf.Wolf
 ```
 
 ### 1.2 `CONDITIONAL`：条件敌对，归中立
 
-| ID | 26.2 依据 |
+| ID | 26.3 依据 |
 |---|---|
 | `minecraft:piglin` | `Piglin extends AbstractPiglin extends Monster`，实现 `Enemy`，但没有 `NeutralMob`；只有玩家没穿金甲/打开箱子等条件下才会攻击，因此不能按“始终敌意”处理。 |
 | `minecraft:llama` | `Llama` 不实现 `Enemy` / `NeutralMob`，但有 `Llama$LlamaHurtByTargetGoal`，被攻击后会反击并吐口水。 |
@@ -69,7 +74,7 @@ javap -classpath "$JAR" -p -c net.minecraft.world.entity.animal.panda.Panda | gr
 
 | ID | 依据 |
 |---|---|
-| `minecraft:zombie_nautilus` | `ZombieNautilus extends AbstractNautilus`，不实现 `Enemy` / `NeutralMob`；但 26.2 的 brain 常量池包含 `ANGRY_AT`、`ATTACK_TARGET_COOLDOWN`、`SensorType.NEAREST_PLAYERS`，因此按敌意处理；未单独做目标选中测试。 |
+| `minecraft:zombie_nautilus` | `ZombieNautilus extends AbstractNautilus`，不实现 `Enemy` / `NeutralMob`；但 26.3 的 brain 常量池包含 `ANGRY_AT`、`ATTACK_TARGET_COOLDOWN`、`SensorType.NEAREST_PLAYERS`，因此按敌意处理；未单独做目标选中测试。 |
 | `minecraft:sulfur_cube` | `SulfurCube extends AbstractCubeMob`（包名 `monster.cubemob`），不实现 `Enemy`；`AbstractCubeMob` 自带攻击 goal，游戏内实测在 `attackHostile=true` 时被选中。 |
 
 验证命令：
@@ -135,7 +140,7 @@ ireturn
 
 ### 2.1 提取方法
 
-从 26.2 客户端 jar 读取所有实体战利品表，`pools` 为空即默认没有任何掉落：
+从 26.3 客户端 jar 读取所有实体战利品表，`pools` 为空即默认没有任何掉落：
 
 ```python
 import json, zipfile, sys
@@ -202,7 +207,7 @@ with zipfile.ZipFile(jar) as z:
 | `rotation` | `"visible"` | 旧默认行为 |
 | `priority` | `"closest"` | 旧默认行为 |
 
-实体 ID 规范化规则：去空白、转小写、无命名空间时补 `minecraft:`、用 `Identifier.tryParse` 校验语法。该规则来自 Minecraft 的 `ResourceLocation` / 26.2 的 `Identifier` 约定，不校验实体是否已注册。
+实体 ID 规范化规则：去空白、转小写、无命名空间时补 `minecraft:`、用 `Identifier.tryParse` 校验语法。该规则来自 Minecraft 的 `ResourceLocation` / 26.3 的 `Identifier` 约定，不校验实体是否已注册。
 
 ## 4. 评分与空间常量
 
@@ -236,9 +241,9 @@ with zipfile.ZipFile(jar) as z:
 | `CLIENT_TIMEOUT_MS` | `5000` | 客户端线程 5 秒未响应即 504，设计值 |
 | 状态码 200/204/400/404/405/409/413/500/504 | — | HTTP 语义 + 模组约定 |
 | `range`/`fov` 上下界 | 见上表 | 项目限制 |
-| 实体战利品表总数 | 109 | 26.2 客户端 jar 实际计数 |
+| 实体战利品表总数 | 109 | 26.3 客户端 jar 实际计数 |
 
-## 7. 26.2 升级时的重新核对流程
+## 7. 版本升级时的重新核对流程
 
 1. 确认新版本客户端 jar 路径和 SHA-256。
 2. 重新运行第 2.1 节脚本，得到新的空战利品表集合。

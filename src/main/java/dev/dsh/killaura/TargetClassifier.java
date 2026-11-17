@@ -14,7 +14,7 @@ import net.minecraft.world.entity.monster.Enemy;
  * Classifies a living entity for target selection.
  *
  * <p>Only client-available data is used: the entity class, {@link Enemy} / {@link NeutralMob}
- * markers, the current light level (for spiders) and a small set of 26.2-specific exceptions.
+ * markers, the current light level (for spiders) and a small set of 26.3-specific exceptions.
  * The server's current AI target is not synchronized to the client, so "is hostile right now"
  * cannot be answered exactly; conditional mobs are therefore treated as neutral.
  */
@@ -42,7 +42,7 @@ public final class TargetClassifier {
             "minecraft:pufferfish");
 
     /**
-     * 26.2 mobs that are hostile without implementing {@link Enemy} (brain-based AI).
+     * 26.3 mobs that are hostile without implementing {@link Enemy} (brain-based AI).
      */
     private static final Set<String> FORCED_HOSTILE = Set.of(
             "minecraft:zombie_nautilus",
@@ -63,8 +63,8 @@ public final class TargetClassifier {
             "minecraft:cave_spider");
 
     /**
-     * Friendly entities whose 26.2 entity loot table has no pools, i.e. they never drop loot.
-     * Extracted from {@code data/minecraft/loot_table/entities/*.json} in the 26.2 client jar.
+     * Friendly entities whose 26.3 entity loot table has no pools, i.e. they never drop loot.
+     * Extracted from {@code data/minecraft/loot_table/entities/*.json} in the 26.3 client jar.
      * Player-supplied equipment (saddles, horse armor, harnesses, ...) is not considered.
      */
     private static final Set<String> FRIENDLY_NO_DROPS = Set.of(
